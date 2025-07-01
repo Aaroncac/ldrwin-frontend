@@ -1,80 +1,74 @@
-const api = "https://ldrwin-backend.onrender.com/api";
+const api = "https://ldrwin-backend.onrender.com";
+let token = "";
 
-document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("loginForm");
-  const registerForm = document.getElementById("registerForm");
+function register() {
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  fetch(api + "/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nome: email.split("@")[0], email, senha })
+  }).then(res => res.json()).then(data => {
+    alert(data.msg || data.erro);
+  });
+}
 
-  if (loginForm) {
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
-      try {
-        const res = await fetch(api + "/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, senha }),
-        });
-        const data = await res.json();
-        if (data.token) {
-          localStorage.setItem("token", data.token);
-          window.location.href = "dashboard.html";
-        } else {
-          document.getElementById("loginError").textContent = data.erro || "Erro ao fazer login";
-        }
-      } catch (err) {
-        document.getElementById("loginError").textContent = "Erro de conexão com o servidor.";
-      }
-    });
-  }
-
-  if (registerForm) {
-    registerForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const nome = document.getElementById("nome").value;
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
-      try {
-        const res = await fetch(api + "/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nome, email, senha }),
-        });
-        const data = await res.json();
-        if (data.msg) {
-          window.location.href = "index.html";
-        } else {
-          document.getElementById("registerError").textContent = data.erro || "Erro ao cadastrar";
-        }
-      } catch (err) {
-        document.getElementById("registerError").textContent = "Erro de conexão com o servidor.";
-      }
-    });
-  }
-
-  if (window.location.pathname.includes("dashboard.html")) {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "index.html";
-      return;
+function login() {
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  fetch(api + "/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, senha })
+  }).then(res => res.json()).then(data => {
+    if (data.token) {
+      token = data.token;
+      document.querySelector(".auth").style.display = "none";
+      document.querySelector(".dashboard").style.display = "block";
+      atualizarPerfil();
+    } else {
+      alert(data.erro);
     }
-    fetch(api + "/profile", {
-      method: "GET",
-      headers: { Authorization: "Bearer " + token },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.nome) {
-          document.getElementById("userData").textContent = "Usuário: " + data.nome;
-        } else {
-          localStorage.removeItem("token");
-          window.location.href = "index.html";
-        }
-      });
-  }
-});
+  });
+}
 
-function logout() {
-  localStorage.removeItem("token");
-  window.location.href = "index.html";
+function atualizarPerfil() {
+  fetch(api + "/api/profile", {
+    headers: { "Authorization": "Bearer " + token }
+  }).then(res => res.json()).then(data => {
+    document.getElementById("saldoReal").innerText = data.saldoReal.toFixed(2);
+    document.getElementById("saldoBonus").innerText = data.saldoBonus.toFixed(2);
+    document.getElementById("apostasAcumuladas").innerText = data.apostasAcumuladas.toFixed(2);
+    document.getElementById("bonusLiberado").innerText = data.bonusLiberado ? "Sim" : "Não";
+  });
+}
+
+function jogar() {
+  const aposta = parseFloat(document.getElementById("aposta").value);
+  const bombas = parseInt(document.getElementById("bombas").value);
+
+  if (isNaN(aposta) || aposta < 0.5 || aposta > 100) {
+    document.getElementById("mensagem").innerText = "Aposta deve ser entre R$0.50 e R$100.";
+    return;
+  }
+  if (isNaN(bombas) || bombas < 3 || bombas > 24) {
+    document.getElementById("mensagem").innerText = "Número de bombas deve ser entre 3 e 24.";
+    return;
+  }
+
+  fetch(api + "/api/mines/play", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify({ aposta, bombas })
+  }).then(res => res.json()).then(data => {
+    if (data.erro) {
+      document.getElementById("mensagem").innerText = data.erro;
+    } else {
+      document.getElementById("mensagem").innerText = data.mensagem;
+      atualizarPerfil();
+    }
+  });
 }
