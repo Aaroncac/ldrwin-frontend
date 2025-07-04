@@ -1,36 +1,289 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>LDRWIN - Mines</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LDRWin Casino</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'casino-blue': '#1e3a8a',
+            'casino-gold': '#facc15',
+          }
+        }
+      }
+    }
+  </script>
 </head>
 <body>
-  <div class="container">
-    <h1>LDRWIN - Jogo Mines</h1>
-    <div class="auth">
-      <input id="email" type="email" placeholder="Email" />
-      <input id="senha" type="password" placeholder="Senha" />
-      <button onclick="login()">Entrar</button>
-      <button onclick="register()">Cadastrar</button>
-    </div>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.22.5/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-    <div class="dashboard" style="display:none;">
-      <p><strong>Saldo Real:</strong> R$<span id="saldoReal">0</span></p>
-      <p><strong>Saldo Bônus:</strong> R$<span id="saldoBonus">0</span></p>
-      <p><strong>Rollover:</strong> R$<span id="apostasAcumuladas">0</span> / R$200</p>
-      <p><strong>Bônus Liberado:</strong> <span id="bonusLiberado">Não</span></p>
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
+      const [minesCells, setMinesCells] = useState([]);
+      const [doubleChoice, setDoubleChoice] = useState('');
 
-      <div class="game">
-        <input id="aposta" type="number" step="0.01" min="0.5" max="100" placeholder="Valor da aposta" />
-        <input id="bombas" type="number" min="3" max="24" value="5" />
-        <button onclick="jogar()">Jogar</button>
-      </div>
+      const API_URL = 'https://seu-backend.render.com';
 
-      <div id="mensagem"></div>
-    </div>
-  </div>
-  <script src="script.js"></script>
+      useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          fetch(`${API_URL}/api/login`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(res => res.json()).then(data => {
+            if (data.userId) setUser(data);
+          });
+        }
+      }, []);
+
+      const register = async (e) => {
+        e.preventDefault();
+        try {
+          const response = await fetch(`${API_URL}/api/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            localStorage.setItem('token', data.token);
+            setUser({ id: data.userId, username, balance: data.balance, bonus: data.bonus });
+            alert('Registro concluído! R$20 de bônus adicionados.');
+          } else {
+            alert(data.error);
+          }
+        } catch (error) {
+          alert('Erro ao registrar: ' + error.message);
+        }
+      };
+
+      const login = async (e) => {
+        e.preventDefault();
+        try {
+          const response = await fetch(`${API_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            localStorage.setItem('token', data.token);
+            setUser(data);
+          } else {
+            alert(data.error);
+          }
+        } catch (error) {
+          alert('Erro ao fazer login: ' + error.message);
+        }
+      };
+
+      const playMines = async (betAmount) => {
+        try {
+          const response = await fetch(`${API_URL}/api/mines/play`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+            body: JSON.stringify({ userId: user.id, betAmount, cells: minesCells }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setUser({ ...user, balance: data.balance, bonus: data.bonus });
+            alert(data.result);
+          } else {
+            alert(data.error);
+          }
+        } catch (error) {
+          alert('Erro ao jogar Mines: ' + error.message);
+        }
+      };
+
+      const playDouble = async (betAmount) => {
+        try {
+          const response = await fetch(`${API_URL}/api/double/play`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+            body: JSON.stringify({ userId: user.id, betAmount, choice: doubleChoice }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setUser({ ...user, balance: data.balance, bonus: data.bonus });
+            alert(`${data.result} Cor: ${data.color}`);
+          } else {
+            alert(data.error);
+          }
+        } catch (error) {
+          alert('Erro ao jogar Double: ' + error.message);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-900 text-white">
+          <nav className="bg-casino-blue p-4 fixed w-full top-0 z-10">
+            <ul className="flex space-x-6 justify-center">
+              <li><a href="#home" className="hover:text-casino-gold">Início</a></li>
+              <li><a href="#mines" className="hover:text-casino-gold">Mines</a></li>
+              <li><a href="#double" className="hover:text-casino-gold">Double</a></li>
+              <li><a href="#slots" className="hover:text-casino-gold">Slots</a></li>
+              <li><a href="#sports" className="hover:text-casino-gold">Apostas Esportivas</a></li>
+            </ul>
+          </nav>
+          <div className="container mx-auto p-6 pt-20">
+            <h1 className="text-4xl font-bold text-casino-gold text-center mb-6">LDRWin Casino</h1>
+            {user ? (
+              <div className="text-center mb-6">
+                <p className="text-xl">Bem-vindo, {user.username}!</p>
+                <p>Saldo: R${user.balance.toFixed(2)} | Bônus: R${user.bonus.toFixed(2)}</p>
+                <button
+                  className="mt-2 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded"
+                  onClick={() => { localStorage.removeItem('token'); setUser(null); }}
+                >
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <div className="max-w-md mx-auto mb-8">
+                <h2 className="text-2xl font-bold text-casino-gold mb-4">Registrar</h2>
+                <form onSubmit={register} className="flex flex-col space-y-4 mb-4">
+                  <input
+                    type="text"
+                    placeholder="Usuário"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="p-3 bg-gray-700 rounded text-white"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="p-3 bg-gray-700 rounded text-white"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="bg-casino-gold hover:bg-yellow-600 text-gray-900 font-bold py-3 px-4 rounded"
+                  >
+                    Criar Conta
+                  </button>
+                </form>
+                <h2 className="text-2xl font-bold text-casino-gold mb-4">Login</h2>
+                <form onSubmit={login} className="flex flex-col space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Usuário"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="p-3 bg-gray-700 rounded text-white"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="p-3 bg-gray-700 rounded text-white"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="bg-casino-blue hover:bg-blue-700 text-white font-bold py-3 px-4 rounded"
+                  >
+                    Entrar
+                  </button>
+                </form>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 className="text-2xl font-bold text-casino-gold">Mines</h2>
+                <p className="mt-2">Escolha células e evite as bombas!</p>
+                <div className="grid grid-cols-5 gap-1 mt-4">
+                  {Array.from({ length: 25 }, (_, i) => (
+                    <button
+                      key={i}
+                      className={`p-2 bg-gray-700 rounded ${minesCells.includes(i) ? 'bg-blue-500' : ''}`}
+                      onClick={() => setMinesCells([...minesCells, i].slice(-5))}
+                    >
+                      {minesCells.includes(i) ? 'X' : '?'}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="mt-4 bg-casino-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                  onClick={() => playMines(1)}
+                  disabled={!user || minesCells.length === 0}
+                >
+                  Jogar Mines (R$1)
+                </button>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 className="text-2xl font-bold text-casino-gold">Double</h2>
+                <p className="mt-2">Aposte em vermelho ou preto!</p>
+                <div className="flex space-x-4 mt-4">
+                  <button
+                    className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded"
+                    onClick={() => setDoubleChoice('red')}
+                  >
+                    Vermelho
+                  </button>
+                  <button
+                    className="bg-black hover:bg-gray-800 text-white py-2 px-4 rounded"
+                    onClick={() => setDoubleChoice('black')}
+                  >
+                    Preto
+                  </button>
+                </div>
+                <button
+                  className="mt-4 bg-casino-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                  onClick={() => playDouble(1)}
+                  disabled={!user || !doubleChoice}
+                >
+                  Jogar Double (R$1)
+                </button>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 className="text-2xl font-bold text-casino-gold">Slots</h2>
+                <p className="mt-2">Gire os rolos e ganhe!</p>
+                <button
+                  className="mt-4 bg-casino-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                  onClick={() => alert('Integração com NuxGame em desenvolvimento')}
+                >
+                  Jogar Slots
+                </button>
+              </div>
+              <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 className="text-2xl font-bold text-casino-gold">Apostas Esportivas</h2>
+                <p className="mt-2">Aposte nos seus esportes favoritos!</p>
+                <button
+                  className="mt-4 bg-casino-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                  onClick={() => alert('Integração com BetRadar em desenvolvimento')}
+                >
+                  Apostar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>
